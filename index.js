@@ -7,8 +7,6 @@ const { v4: uuidv4 } = require('uuid');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const randomUseragent = require('random-useragent');
 
-const refreshToken = process.env.REFRESH_TOKEN;
-
 const colors = {
     reset: "\x1b[0m",
     cyan: "\x1b[36m",
@@ -40,18 +38,17 @@ const logger = {
 };
 
 /**
- * 
- * @returns {string[]} 
+ * Membaca daftar proxy dari file
+ * @returns {string[]} Daftar proxy
  */
 function readProxies() {
     const proxyFilePath = path.join(__dirname, 'proxies.txt');
     try {
         if (fs.existsSync(proxyFilePath)) {
-            const proxies = fs.readFileSync(proxyFilePath, 'utf-8')
+            return fs.readFileSync(proxyFilePath, 'utf-8')
                 .split('\n')
                 .map(p => p.trim())
                 .filter(p => p);
-            return proxies;
         }
     } catch (error) {
         logger.error(`Error reading proxies.txt: ${error.message}`);
@@ -59,18 +56,39 @@ function readProxies() {
     return [];
 }
 
+/**
+ * Membaca daftar akun dari file
+ * @returns {string[]} Daftar refresh token
+ */
+function readAccounts() {
+    const accountFilePath = path.join(__dirname, 'accounts.txt');
+    try {
+        if (fs.existsSync(accountFilePath)) {
+            return fs.readFileSync(accountFilePath, 'utf-8')
+                .split('\n')
+                .map(a => a.trim())
+                .filter(a => a);
+        }
+    } catch (error) {
+        logger.error(`Error reading accounts.txt: ${error.message}`);
+    }
+    return [];
+}
+
 class TitanNode {
-    constructor(refreshToken, proxy = null) {
+    constructor(refreshToken, proxy = null, accountIndex) {
         this.refreshToken = refreshToken;
         this.proxy = proxy;
+        this.accountIndex = accountIndex;
         this.accessToken = null;
         this.userId = null;
-        this.deviceId = uuidv4(); 
+        this.deviceId = uuidv4();
+        this.isActive = true;
 
         const agent = this.proxy ? new HttpsProxyAgent(this.proxy) : null;
 
         this.api = axios.create({
-            httpsAgent: agent, 
+            httpsAgent: agent,
             headers: {
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
@@ -80,12 +98,12 @@ class TitanNode {
         });
 
         this.ws = null;
-        this.reconnectInterval = 1000 * 60 * 5; 
+        this.reconnectInterval = 1000 * 60 * 5;
         this.pingInterval = null;
     }
 
     async refreshAccessToken() {
-        logger.loading('Attempting to refresh access token...');
+        logger.loading(`[Akun #${this.accountIndex}] Memperbarui token akses...`);
         try {
             const response = await this.api.post('https://task.titannet.info/api/auth/refresh-token', {
                 refresh_token: this.refreshToken,
@@ -95,20 +113,20 @@ class TitanNode {
                 this.accessToken = response.data.data.access_token;
                 this.userId = response.data.data.user_id;
                 this.api.defaults.headers.common['Authorization'] = `Bearer ${this.accessToken}`;
-                logger.success('Access token refreshed successfully!');
+                logger.success(`[Akun #${this.accountIndex}] Token akses berhasil diperbarui!`);
                 return true;
             } else {
-                logger.error(`Failed to refresh token: ${response.data.msg || 'Unknown error'}`);
+                logger.error(`[Akun #${this.accountIndex}] Gagal memperbarui token: ${response.data.msg || 'Unknown error'}`);
                 return false;
             }
         } catch (error) {
-            logger.error(`Error refreshing access token: ${error.message}`);
+            logger.error(`[Akun #${this.accountIndex}] Error: ${error.message}`);
             return false;
         }
     }
 
     async registerNode() {
-        logger.loading('Registering node...');
+        logger.loading(`[Akun #${this.accountIndex}] Mendaftarkan node...`);
         try {
             const payload = {
                 ext_version: "0.0.4",
@@ -120,18 +138,18 @@ class TitanNode {
             const response = await this.api.post('https://task.titannet.info/api/webnodes/register', payload);
 
             if (response.data && response.data.code === 0) {
-                logger.success('Node registered successfully.');
-                logger.info(`Initial Points: ${JSON.stringify(response.data.data)}`);
+                logger.success(`[Akun #${this.accountIndex}] Node berhasil terdaftar`);
+                logger.info(`[Akun #${this.accountIndex}] Poin Awal: ${JSON.stringify(response.data.data)}`);
             } else {
-                logger.error(`Node registration failed: ${response.data.msg || 'Unknown error'}`);
+                logger.error(`[Akun #${this.accountIndex}] Pendaftaran gagal: ${response.data.msg || 'Unknown error'}`);
             }
         } catch (error) {
-            logger.error(`Error registering node: ${error.message}`);
+            logger.error(`[Akun #${this.accountIndex}] Error: ${error.message}`);
         }
     }
 
     connectWebSocket() {
-        logger.loading('Connecting to WebSocket...');
+        logger.loading(`[Akun #${this.accountIndex}] Menghubungkan WebSocket...`);
         const wsUrl = `wss://task.titannet.info/api/public/webnodes/ws?token=${this.accessToken}&device_id=${this.deviceId}`;
         
         const agent = this.proxy ? new HttpsProxyAgent(this.proxy) : null;
@@ -144,7 +162,7 @@ class TitanNode {
         });
 
         this.ws.on('open', () => {
-            logger.success('WebSocket connection established. Waiting for jobs...');
+            logger.success(`[Akun #${this.accountIndex}] WebSocket terhubung. Menunggu pekerjaan...`);
             this.pingInterval = setInterval(() => {
                 if (this.ws.readyState === WebSocket.OPEN) {
                     const echoMessage = JSON.stringify({ cmd: 1, echo: "echo me", jobReport: { cfgcnt: 2, jobcnt: 0 } });
@@ -161,67 +179,88 @@ class TitanNode {
                     this.ws.send(JSON.stringify(response));
                 }
                 if (message.userDataUpdate) {
-                    logger.point(`Points Update - Today: ${message.userDataUpdate.today_points}, Total: ${message.userDataUpdate.total_points}`);
+                    logger.point(`[Akun #${this.accountIndex}] Poin - Hari Ini: ${message.userDataUpdate.today_points}, Total: ${message.userDataUpdate.total_points}`);
                 }
             } catch (error) {
-                logger.warn(`Could not parse message: ${data}`);
+                logger.warn(`[Akun #${this.accountIndex}] Pesan tidak valid: ${data}`);
             }
         });
 
         this.ws.on('error', (error) => {
-            logger.error(`WebSocket error: ${error.message}`);
+            logger.error(`[Akun #${this.accountIndex}] WebSocket error: ${error.message}`);
             this.ws.close();
         });
 
         this.ws.on('close', () => {
-            logger.warn('WebSocket connection closed. Attempting to reconnect...');
-            clearInterval(this.pingInterval);
-            setTimeout(() => this.start(), this.reconnectInterval);
+            if (this.isActive) {
+                logger.warn(`[Akun #${this.accountIndex}] WebSocket tertutup. Mencoba menghubungkan ulang...`);
+                clearInterval(this.pingInterval);
+                setTimeout(() => this.start(), this.reconnectInterval);
+            }
         });
     }
 
     async start() {
-        logger.banner();
         if (this.proxy) {
-            logger.proxy(`Using Proxy: ${this.proxy}`);
+            logger.proxy(`[Akun #${this.accountIndex}] Menggunakan Proxy: ${this.proxy}`);
         } else {
-            logger.proxy('Running in Direct Mode (No Proxy)');
+            logger.proxy(`[Akun #${this.accountIndex}] Mode Direct (Tanpa Proxy)`);
         }
-        logger.step(`Using Device ID: ${this.deviceId}`);
+        logger.step(`[Akun #${this.accountIndex}] Device ID: ${this.deviceId}`);
         
         const tokenRefreshed = await this.refreshAccessToken();
         if (tokenRefreshed) {
             await this.registerNode();
             this.connectWebSocket();
         } else {
-            logger.error('Could not start bot due to token refresh failure.');
+            logger.error(`[Akun #${this.accountIndex}] Gagal memulai bot`);
         }
+    }
+
+    stop() {
+        this.isActive = false;
+        if (this.ws) {
+            this.ws.close();
+        }
+        clearInterval(this.pingInterval);
+        logger.warn(`[Akun #${this.accountIndex}] Bot dihentikan`);
     }
 }
 
 function main() {
-    if (!refreshToken) {
-        logger.error('Error: REFRESH_TOKEN is not set in the .env file.');
-        logger.warn('Please create a .env file and add your REFRESH_TOKEN to it.');
+    logger.banner();
+
+    const accounts = readAccounts();
+    if (accounts.length === 0) {
+        logger.error('Tidak ada akun di accounts.txt');
+        logger.warn('Buat file accounts.txt dan isi dengan refresh token (satu token per baris)');
         return;
     }
 
     const proxies = readProxies();
+    logger.info(`Ditemukan ${accounts.length} akun dan ${proxies.length} proxy`);
 
-    if (proxies.length > 0) {
-        logger.info(`Found ${proxies.length} proxies. Starting a bot for each one.`);
-        proxies.forEach((proxy, index) => {
-            
-            setTimeout(() => {
-                const bot = new TitanNode(refreshToken, proxy);
-                bot.start();
-            }, index * 10000); 
-        });
-    } else {
-        logger.info('No proxies found in proxies.txt. Running in direct mode.');
-        const bot = new TitanNode(refreshToken);
-        bot.start();
-    }
+    const bots = [];
+    
+    accounts.forEach((account, index) => {
+        const proxy = proxies.length > 0 
+            ? proxies[index % proxies.length] 
+            : null;
+        
+        setTimeout(() => {
+            logger.step(`Memulai bot untuk akun #${index + 1}`);
+            const bot = new TitanNode(account, proxy, index + 1);
+            bots.push(bot);
+            bot.start();
+        }, index * 10000);
+    });
+
+    // Handle proses shutdown
+    process.on('SIGINT', () => {
+        logger.warn('\nMenghentikan semua bot...');
+        bots.forEach(bot => bot.stop());
+        setTimeout(() => process.exit(), 1000);
+    });
 }
 
 main();
