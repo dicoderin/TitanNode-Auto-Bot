@@ -1,81 +1,124 @@
 # TitanNode Auto Bot
 
-An automatic bot to connect to the Titan Network node extension and earn points (TNTIP) continuously. Built with Node.js, this bot supports proxies and is designed to run 24/7.
 
----
+Bot otomatis untuk Titan Network Node yang mendukung multi-akun dengan sistem rotasi proxy. Dikembangkan untuk mempermudah pengelolaan node Titan Network secara efisien.
 
-## ✨ Features
+## Fitur Utama
 
-- **Full Automation**: Just run it, and the bot will handle the rest.
-- **Token Management**: Automatically refreshes the access token to keep the session active.
-- **Proxy Support**: Run multiple bots simultaneously using a proxy list from `proxies.txt`.
-- **Direct Mode**: If no proxies are provided, the bot will run using your main internet connection.
-- **Secure**: Safely stores your refresh token in a `.env` file.
-- **Random User-Agent**: Uses a random user-agent for each connection to appear more natural.
+- ✅ **Multi-Akun Support** - Jalankan puluhan akun sekaligus
+- 🔁 **Proxy Rotation** - Dukungan penuh rotasi proxy
+- 💰 **Poin Otomatis** - Kumpulkan poin Titan secara otomatis
+- 📊 **Real-time Monitoring** - Pantau poin secara real-time
+- 🔐 **Auto Reconnect** - Sistem reconnection otomatis
+- 📈 **Scalable** - Dukungan untuk ratusan akun
 
----
+## Prasyarat
 
-## ⚙️ Installation
+- Node.js v16+
+- NPM/Yarn
+- Akun Titan Network
+- Proxy (opsional)
 
-1.  **Clone the Repository**
-    ```bash
-    git clone [https://github.com/vikitoshi/TitanNode-Auto-Bot.git](https://github.com/vikitoshi/TitanNode-Auto-Bot.git)
-    cd TitanNode-Auto-Bot
-    ```
+## Instalasi
 
-2.  **Install Dependencies**
-    Make sure you have [Node.js](https://nodejs.org/) version 18 or higher.
-    ```bash
-    npm install
-    ```
-
----
-
-## 🔧 Configuration
-
-Before running the bot, you need to complete the following configuration:
-
-### 1. Refresh Token (`.env`)
-
-1.  Copy the `.env.example` file to `.env`.
-    ```bash
-    cp .env.example .env
-    ```
-2.  Open the `.env` file and enter your `REFRESH_TOKEN`.
-    ```env
-    # Replace with your refresh token
-    REFRESH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    ```
-    > **How to get `REFRESH_TOKEN`**: Log in to the [Titan Dashboard](https://edge.titannet.info/signup?inviteCode=X3X2TJ3A), open Developer Tools (F12) -> Application -> Local Storage, find `titan-edge-user-info`, and copy the value from `refresh_token`.
-
-### 2. Proxies (`proxies.txt`) - Optional
-
-If you want to use proxies:
-
-1.  Create a `proxies.txt` file in the main directory.
-2.  Enter your proxy list, one proxy per line. The bot will create a connection for each proxy listed.
-    ```txt
-    # Format: http://[user:password@]host:port
-    [http://user1:pass1@proxy1.com:8080](http://user1:pass1@proxy1.com:8080)
-    [http://user2:pass2@proxy2.com:8080](http://user2:pass2@proxy2.com:8080)
-    socks5://user3:pass3@proxy3.com:1080
-    ```
-    If the `proxies.txt` file is empty or does not exist, the bot will run in direct mode (without proxies).
-
----
-
-## 🚀 Running the Bot
-
-After the configuration is complete, run the bot with the following command:
-
+1. Clone repositori ini:
 ```bash
-npm start
+git clone https://github.com/dicoderin/TitanNode-Auto-Bot.git
+cd TitanNode-Auto-Bot
 ```
 
-The bot will start the connection, display the status, and begin collecting points for you.
+2. Install dependencies:
+```bash
+npm install
+```
 
----
+3. Buat file konfigurasi:
+```bash
+cp .env.example .env
+```
 
-## ⚠️ Disclaimer
+4. Isi file `accounts.txt` dengan refresh token Anda
 
-This application is created for educational purposes. The use of bots may violate the terms and conditions of the Titan Network. Use at your own risk. The developer is not responsible for any account suspension or other losses.
+## Konfigurasi
+
+### 1. File Akun (`accounts.txt`)
+Buat file `accounts.txt` di root direktori, isi dengan refresh token Titan Network (satu token per baris):
+```
+refresh_token_akun_1
+refresh_token_akun_2
+refresh_token_akun_3
+```
+
+### 2. File Proxy (`proxies.txt`)
+Opsional: Untuk menggunakan proxy, buat file `proxies.txt` dengan format:
+```
+http://user:pass@ip:port
+socks5://ip:port
+http://ip:port
+```
+
+### 3. Environment Variables (`.env`)
+Konfigurasi opsional di file `.env`:
+```env
+# Log level (verbose, debug, info, warn, error)
+LOG_LEVEL=info
+
+# Interval reconnection (dalam milidetik)
+RECONNECT_INTERVAL=300000
+```
+
+## Penggunaan
+
+Jalankan bot:
+```bash
+node index.js
+```
+
+### Perintah Tambahan
+- **Mulai semua akun**: `node index.js`
+- **Hentikan bot**: Tekan `Ctrl+C`
+
+## Struktur Log
+```
+---------------------------------------------
+   Titan Node Auto Bot - Airdrop Insiders   
+---------------------------------------------
+
+[i] Ditemukan 5 akun dan 3 proxy
+[➤] Memulai bot untuk akun #1
+[🌐] [Akun #1] Menggunakan Proxy: http://103.149.162.1:8000
+[➤] [Akun #1] Device ID: 7b5e3a8f-12d4-4e8c-a9f2-3b7c6d9e0f1a
+[⟳] [Akun #1] Memperbarui token akses...
+[✅] [Akun #1] Token akses berhasil diperbarui!
+[⟳] [Akun #1] Mendaftarkan node...
+[✅] [Akun #1] Node berhasil terdaftar
+[i] [Akun #1] Poin Awal: {"today_points":0,"total_points":0}
+[⟳] [Akun #1] Menghubungkan WebSocket...
+[✅] [Akun #1] WebSocket terhubung. Menunggu pekerjaan...
+[💰] [Akun #1] Poin - Hari Ini: 15, Total: 150
+```
+
+## FAQ
+
+### Q: Bagaimana cara mendapatkan refresh token?
+A: 
+1. Login ke dashboard Titan Network
+2. Buka developer tools (F12)
+3. Cari request ke endpoint `api/auth/login`
+4. Salin nilai `refresh_token` dari response
+
+### Q: Apakah bot ini aman digunakan?
+A: Bot ini menggunakan API resmi Titan Network dengan metode yang sama seperti aplikasi resmi. Namun gunakan dengan risiko sendiri.
+
+### Q: Berapa banyak akun yang bisa dijalankan?
+A: Secara teknis tidak ada batasan, tetapi disarankan maksimal 50 akun per server dengan spesifikasi menengah.
+
+## Berkontribusi
+
+Pull request dipersilakan! Untuk perubahan besar, buka issue terlebih dahulu untuk mendiskusikan perubahan yang ingin Anda buat.
+
+1. Fork project
+2. Buat branch fitur (`git checkout -b fitur/namafitur`)
+3. Commit perubahan (`git commit -m 'Tambahkan fitur'`)
+4. Push ke branch (`git push origin fitur/namafitur`)
+5. Buka Pull Request
